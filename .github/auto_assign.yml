@@ -7,10 +7,8 @@ addAssignees: author
 # Reviewer 추가할 사용자 목록
 reviewers:
   - hj4645
-  - ktae23
   - youngDaLee
   - wonjun3991
-  - suzhanlee
 
 
 # 추가할 리뷰어 수
