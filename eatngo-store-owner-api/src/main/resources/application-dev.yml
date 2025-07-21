@@ -16,7 +16,7 @@ spring:
     name: eatngo-store-owner-api
   datasource:
     url: ${PG_URL}
-    username: eatngo_user
+    username: eatngo_admin
     password: ${PG_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
