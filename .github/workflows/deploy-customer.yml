@@ -13,12 +13,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
-    env:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-      ECR_REPO: eatngo-customer-api
-      ECR_URI: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/eatngo-customer-api
-
     steps:
       - name: Checkout source
         uses: actions/checkout@v3
@@ -46,83 +40,21 @@ jobs:
           AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+      - name: Upload jar to EC2
+        uses: appleboy/scp-action@v0.1.4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "eatngo-customer-api/build/libs/*.jar"
+          target: "/home/ec2-user/eatngo-customer-api"
 
-      - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v1
-
-      - name: Build & Push Docker image to ECR
-        run: |
-          docker buildx build \
-            --platform linux/amd64 \
-            -f eatngo-customer-api/Dockerfile \
-            -t $ECR_URI:latest \
-            --push \
-            .
-
-      - name: Register new ECS task definition
-        run: |
-          IMAGE_URI="$ECR_URI:latest"
-
-          aws ecs describe-task-definition \
-            --task-definition eatngo-customer-api \
-            --query "taskDefinition" \
-            --region $AWS_REGION > task-def-raw.json
-        
-          jq \
-          --arg IMAGE "$IMAGE_URI" \
-          --arg PROFILE "dev" \
-          --arg ACCESS_KEY "${{ secrets.AWS_ACCESS_KEY_ID }}" \
-          --arg SECRET_KEY "${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
-          '{
-            family,
-            networkMode,
-            requiresCompatibilities,
-            cpu,
-            memory,
-            taskRoleArn,
-            executionRoleArn,
-            containerDefinitions: (
-              .containerDefinitions | map(
-                .image = $IMAGE
-                | .environment += [
-                    { name: "SPRING_PROFILES_ACTIVE", value: $PROFILE },
-                    { name: "AWS_ACCESS_KEY", value: $ACCESS_KEY },
-                    { name: "AWS_SECRET_KEY", value: $SECRET_KEY },
-                    { name: "AWS_ACCESS_KEY_ID", value: $ACCESS_KEY },
-                    { name: "AWS_SECRET_ACCESS_KEY", value: $SECRET_KEY }
-                  ]
-              )
-            )
-          }' task-def-raw.json > task-def-customer.json
-
-          aws ecs register-task-definition \
-            --cli-input-json file://task-def-customer.json \
-            --region $AWS_REGION
-
-          CUSTOMER_REVISION=$(aws ecs describe-task-definition \
-            --task-definition eatngo-customer-api \
-            --query "taskDefinition.revision" \
-            --region $AWS_REGION --output text)
-
-          echo "CUSTOMER_REVISION=$CUSTOMER_REVISION" >> $GITHUB_ENV
-
-      - name: Debug print REVISION
-        run: echo "Task Revision is ${{ env.CUSTOMER_REVISION }}"
-
-      - name: Update ECS service
-        run: |
-          aws ecs update-service \
-            --cluster eatngo-cluster \
-            --service eatngo-customer-api-service \
-            --task-definition eatngo-customer-api:${{ env.CUSTOMER_REVISION }} \
-            --force-new-deployment \
-            --region $AWS_REGION
+      - name: Remote deploy on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            pkill -f 'eatngo-customer-api' || true
+            nohup java -jar /home/ec2-user/eatngo-customer-api/*.jar --spring.profiles.active=dev > app.log 2>&1 &
