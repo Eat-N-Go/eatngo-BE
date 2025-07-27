@@ -14,6 +14,7 @@ services:
       - pg_data:/var/lib/postgresql/data
     restart: unless-stopped
 
+ # TODO : Atlas 연결 or 로컬에서도 검색 동작하도록 수정
   mongodb:
     image: mongo:8
     container_name: eatngo-mongodb
@@ -35,6 +36,32 @@ services:
     command: redis-server --requirepass eatngolocal
     volumes:
         - redis_data:/data
+    restart: unless-stopped
+
+  customer-api:
+    build:
+      context: ../../eatngo-customer-api
+      dockerfile: Dockerfile
+    container_name: eatngo-customer-api
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - mongodb
+      - redis
+    restart: unless-stopped
+
+  store-owner-api:
+    build:
+      context: ../../eatngo-store-owner-api
+      dockerfile: Dockerfile
+    container_name: store-owner-api
+    ports:
+      - "8081:8081"
+    depends_on:
+      - postgres
+      - mongodb
+      - redis
     restart: unless-stopped
 
 volumes:
