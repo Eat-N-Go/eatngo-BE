@@ -6,6 +6,7 @@ import com.eatngo.auth.constants.AuthenticationConstants.SET_COOKIE_HEADER
 import com.eatngo.auth.token.TokenProvider
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.core.Authentication
 import org.springframework.security.oauth2.core.user.OAuth2User
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler
@@ -15,6 +16,8 @@ import org.springframework.stereotype.Component
 class OAuth2LoginSuccessHandler(
     private val tokenProvider: TokenProvider,
     private val postProcessor: OAuth2SuccessPostProcessor,
+    @Value("\${oauth2.redirect.success-url:http://localhost:3000}")
+    private val successRedirectUrl: String
 ) : AuthenticationSuccessHandler {
 
     override fun onAuthenticationSuccess(
@@ -37,7 +40,7 @@ class OAuth2LoginSuccessHandler(
         val locationHeader = "Location"
         if (response.getHeader(locationHeader) == null) {
             response.status = HttpServletResponse.SC_MOVED_TEMPORARILY
-            response.setHeader(locationHeader, "/")
+            response.setHeader(locationHeader, successRedirectUrl)
         }
 
     }
