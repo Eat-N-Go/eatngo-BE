@@ -29,6 +29,12 @@ class OAuth2LoginSuccessHandler(
         val userId = attributes[PRINCIPAL_KEY]?.toString()?.toLongOrNull()
             ?: throw IllegalArgumentException("User ID not found")
 
+        // 기존 토큰이 있다면 삭제
+        request.cookies
+            ?.find { cookie -> cookie.name == ACCESS_TOKEN }
+            ?.value
+            ?.let { tokenProvider.deleteRefreshToken(it) }
+
         val loginUser = postProcessor.postProcess(userId, response)
         val accessToken = tokenProvider.createAccessToken(loginUser)
         tokenProvider.createRefreshToken(loginUser)
