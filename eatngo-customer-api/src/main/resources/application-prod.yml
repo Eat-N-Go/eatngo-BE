@@ -5,7 +5,7 @@ spring:
   config:
     import:
       - classpath:auth-application.yml
-      - classpath:auth-application-dev.yml
+      - classpath:auth-application-prod.yml
       - classpath:application-metrics.yml
       - aws-parameterstore:/eatngo/
   cloud:
@@ -24,15 +24,10 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
-        highlight_sql: true
-  h2:
-    console:
-      enabled: true
   data:
     redis:
       host: ${REDIS_HOST}
@@ -50,7 +45,7 @@ datastore:
   mongodb:
     uri: ${MONGO_URI}
     database: eatngo
-    username: eatngo-dev
+    username: eatngo-prod
     password: ${MONGO_PW}
 
 springdoc:
@@ -66,10 +61,4 @@ swagger:
 
 logging:
   level:
-    org.hibernate.SQL: debug
-    org.hibernate.orm.jdbc.bind: trace
-
-eatngo:
-  search:
-    scheduler:
-      enabled: false
+    org.hibernate.SQL: warn

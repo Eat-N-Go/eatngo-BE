@@ -25,8 +25,3 @@ jwt:
 oauth2:
   kakao:
     url: https://kapi.kakao.com
-  redirect:
-    success-url: ${OAUTH2_SUCCESS_REDIRECT_URL:http://localhost:3000}
-  cookie:
-    domain: ${OAUTH2_COOKIE_DOMAIN:localhost}
-    secure: ${OAUTH2_COOKIE_SECURE:false}

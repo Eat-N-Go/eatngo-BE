@@ -1,0 +1,6 @@
+oauth2:
+  redirect:
+    success-url: ${OAUTH2_SUCCESS_REDIRECT_URL:/}
+  cookie:
+    domain: ${OAUTH2_COOKIE_DOMAIN:.eatngo.org}
+    secure: ${OAUTH2_COOKIE_SECURE:true}
