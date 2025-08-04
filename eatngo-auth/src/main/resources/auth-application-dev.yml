@@ -1,0 +1,7 @@
+oauth2:
+  redirect:
+    success-url: http://localhost:3000
+    store-register-url: http://localhost:3000/store/register
+  cookie:
+    domain: localhost
+    secure: false
