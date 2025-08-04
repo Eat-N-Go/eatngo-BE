@@ -14,7 +14,7 @@ spring:
         access-key: ${AWS_ACCESS_KEY}
         secret-key: ${AWS_SECRET_KEY}
   application:
-    name: eatngo-customer-api
+    name: eatngo-store-owner-api
   datasource:
     url: ${PG_URL}
     username: eatngo_admin
@@ -55,8 +55,8 @@ springdoc:
     path: /api-docs
 
 swagger:
-  title: "EatNGo 사용자 API"
-  description: "EatNGo 서비스의 사용자용 API 문서"
+  title: "EatNGo 점주 API"
+  description: "EatNGo 서비스의 점주용 API 문서"
   version: "v1.0.0"
 
 logging:
