@@ -1,6 +1,7 @@
 oauth2:
   redirect:
     success-url: ${OAUTH2_SUCCESS_REDIRECT_URL:/}
+    store-register-url: ${OAUTH2_STORE_REGISTER_URL:/store/register}
   cookie:
     domain: ${OAUTH2_COOKIE_DOMAIN:.eatngo.org}
     secure: ${OAUTH2_COOKIE_SECURE:true}

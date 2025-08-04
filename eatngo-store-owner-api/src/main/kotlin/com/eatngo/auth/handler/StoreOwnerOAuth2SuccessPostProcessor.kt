@@ -9,6 +9,7 @@ import com.eatngo.user_account.domain.UserRole
 import com.eatngo.user_account.infra.UserAccountPersistence
 import com.eatngo.user_account.oauth2.constants.Role
 import jakarta.servlet.http.HttpServletResponse
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
@@ -19,6 +20,8 @@ class StoreOwnerOAuth2SuccessPostProcessor(
     private val userAccountPersistence: UserAccountPersistence,
     private val storeOwnerPersistence: StoreOwnerPersistence,
     private val storePersistence: StorePersistence,
+    @Value("\${oauth2.redirect.store-register-url:/store/register}")
+    private val storeRegisterUrl: String
 ) : OAuth2SuccessPostProcessor {
 
     override fun postProcess(
@@ -45,7 +48,7 @@ class StoreOwnerOAuth2SuccessPostProcessor(
 
         if (storePersistence.findByOwnerId(storeOwner.id).isEmpty()) {
             response.status = HttpServletResponse.SC_MOVED_TEMPORARILY
-            response.setHeader("Location", "/store/register")
+            response.setHeader("Location", storeRegisterUrl)
         }
 
         return loginStoreOwner
