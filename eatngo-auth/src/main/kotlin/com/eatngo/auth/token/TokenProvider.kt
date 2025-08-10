@@ -28,6 +28,8 @@ fun refreshKey(loginUser: LoginUser) = "refreshToken:${loginUser.getCurrentRole(
 class TokenProvider(
     @Value("\${jwt.secret}") private val secret: String,
     private val stringRedisTemplate: StringRedisTemplate,
+    @Value("\${oauth2.cookie.domain:localhost}") private val cookieDomain: String,
+    @Value("\${oauth2.cookie.secure:false}") private val cookieSecure: Boolean,
 ) {
 
     private val key: SecretKey = Keys.hmacShaKeyFor(Base64.getDecoder().decode(secret))
@@ -145,11 +147,23 @@ class TokenProvider(
         return ResponseCookie
             .from(name, value)
             .httpOnly(true)
-            .domain(".eatngo.org")
-            .secure(true)
+            .domain(if (cookieDomain == "localhost") null else cookieDomain)
+            .secure(cookieSecure)
             .path("/")
-            .sameSite("None")
+            .sameSite(if (cookieSecure) "None" else "Lax")
             .maxAge(Duration.ofHours(1))
+            .build()
+    }
+
+    fun createExpiredCookie(name: String): ResponseCookie {
+        return ResponseCookie
+            .from(name, "")
+            .httpOnly(true)
+            .domain(if (cookieDomain == "localhost") null else cookieDomain)
+            .secure(cookieSecure)
+            .path("/")
+            .sameSite(if (cookieSecure) "None" else "Lax")
+            .maxAge(0)
             .build()
     }
 }
