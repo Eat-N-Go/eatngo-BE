@@ -33,12 +33,45 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
+      # AWS 자격증명 설정
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      # GitHub Actions Runner의 현재 IP 확인
+      - name: Get runner IP address
+        id: ip
+        uses: haythem/public-ip@v1.3
+
+      # EC2 보안 그룹에 현재 IP 추가 (SSH 접근 허용)
+      - name: Add IP to security group
+        run: |
+          aws ec2 authorize-security-group-ingress \
+            --group-id ${{ secrets.SECURITY_GROUP_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.ip.outputs.ipv4 }}/32 \
+            --tag-specifications 'ResourceType=security-group-rule,Tags=[{Key=Name,Value=GitHub-Actions-Temp},{Key=CreatedBy,Value=GitHub-Actions}]' || echo "Rule may already exist"
+
       - name: Gradle Build (bootJar)
         run: ./gradlew :eatngo-customer-api:bootJar
         env:
           SPRING_PROFILES_ACTIVE: dev
           AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      # JAR 파일 존재 확인
+      - name: Check JAR file
+        run: |
+          echo "=== Built JAR files ==="
+          ls -la eatngo-customer-api/build/libs/
+          if [ ! -f eatngo-customer-api/build/libs/*.jar ]; then
+            echo "ERROR: JAR file not found!"
+            exit 1
+          fi   
 
       - name: Upload jar to EC2
         uses: appleboy/scp-action@v0.1.4
@@ -48,6 +81,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           source: "eatngo-customer-api/build/libs/*.jar"
           target: "/home/ec2-user/eatngo-customer-api"
+          timeout: 30s
 
       - name: Remote deploy on EC2
         uses: appleboy/ssh-action@v1.0.3
@@ -58,3 +92,18 @@ jobs:
           script: |
             pkill -f 'eatngo-customer-api' || true
             nohup java -jar /home/ec2-user/eatngo-customer-api/*.jar --spring.profiles.active=dev > app.log 2>&1 &
+
+      # 배포 완료 후 보안 그룹에서 IP 제거
+      - name: Remove IP from security group
+        if: always()
+        run: |
+          aws ec2 revoke-security-group-ingress \
+            --group-id ${{ secrets.SECURITY_GROUP_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.ip.outputs.ipv4 }}/32 || echo "Rule may not exist or already removed"
+
+      # 배포 결과 확인
+      - name: Verify deployment
+        run: |
+          echo "🎉 Deployment completed!"
