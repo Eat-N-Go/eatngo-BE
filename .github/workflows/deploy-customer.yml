@@ -100,6 +100,8 @@ jobs:
             ls -la /home/ec2-user/
             find /home/ec2-user -name "*.jar" -type f || echo "No JAR files found"       
 
+            host: ${{ secrets.EC2_HOST }}
+
       - name: Remote deploy on EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -108,8 +110,46 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           timeout: 60s
           script: |
-            pkill -f 'eatngo-customer-api' || true
-            nohup java -jar /home/ec2-user/eatngo-customer-api/*.jar --spring.profiles.active=dev > app.log 2>&1 &
+            echo "=== Starting Deployment ==="
+
+          # 기존 프로세스 종료
+            pkill -f 'eatngo-customer-api' || echo "No existing process"
+            sleep 2
+          
+          # JAR 파일 찾기 (경로 수정)
+            JAR_FILE=$(find /home/ec2-user -name "*.jar" -type f | head -n 1)
+          
+            if [ -z "$JAR_FILE" ]; then
+              echo "ERROR: JAR file not found!"
+              ls -la /home/ec2-user/
+              exit 1
+            fi
+
+          echo "Found JAR file: $JAR_FILE"
+
+          # 환경변수와 함께 완전히 분리된 프로세스로 실행
+          env AWS_REGION=ap-northeast-2 \
+              AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY_ID }} \
+              AWS_SECRET_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
+              setsid java -jar "$JAR_FILE" \
+              --spring.profiles.active=dev \
+              --server.port=8080 \
+              > /home/ec2-user/app.log 2>&1 &
+          
+          APP_PID=$!
+          echo "Application started with PID: $APP_PID"
+          echo $APP_PID > /home/ec2-user/app.pid
+          
+          # 프로세스 확인
+          sleep 3
+          if ps -p $APP_PID > /dev/null; then
+            echo "✅ Application is running!"
+          else
+            echo "❌ Application failed to start"
+            echo "=== Error logs ==="
+            tail -n 20 /home/ec2-user/app.log
+            exit 1
+          fi
 
       # 배포 완료 후 보안 그룹에서 IP 제거
       - name: Remove IP from security group
