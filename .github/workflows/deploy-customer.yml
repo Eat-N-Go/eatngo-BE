@@ -110,33 +110,30 @@ jobs:
           timeout: 60s
           script: |
             echo "Executing deployment script..."
-
-          # 백그라운드에서 배포 스크립트 실행
+            
             nohup /home/ec2-user/deploy.sh > /home/ec2-user/deployment.log 2>&1 &
             
-            # 잠시 대기
             sleep 8
             
-            # 결과 확인
             echo "=== Deployment Results ==="
             if [ -f /home/ec2-user/deploy_error.log ]; then
-              echo "❌ Deployment Error:"
-              cat /home/ec2-user/deploy_error.log
-              exit 1
+            echo "❌ Deployment Error:"
+            cat /home/ec2-user/deploy_error.log
+            exit 1
             fi
             
             if [ -f /home/ec2-user/app.pid ]; then
-              PID=$(cat /home/ec2-user/app.pid)
-              if ps -p $PID > /dev/null; then
-                echo "✅ Application is running (PID: $PID)"
-              else
-                echo "❌ Application process died"
-                tail -n 20 /home/ec2-user/app.log
-                exit 1
-              fi
+            PID=$(cat /home/ec2-user/app.pid)
+            if ps -p $PID > /dev/null; then
+            echo "✅ Application is running (PID: $PID)"
             else
-              echo "❌ PID file not found"
-              exit 1
+            echo "❌ Application process died"
+            tail -n 20 /home/ec2-user/app.log
+            exit 1
+            fi
+            else
+            echo "❌ PID file not found"
+            exit 1
             fi
 
       # 배포 완료 후 보안 그룹에서 IP 제거
