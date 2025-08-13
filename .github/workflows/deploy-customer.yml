@@ -55,6 +55,50 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
+          timeout: 60s
           script: |
-            pkill -f 'eatngo-customer-api' || true
-            nohup java -jar /home/ec2-user/eatngo-customer-api/*.jar --spring.profiles.active=prod > app.log 2>&1 &
+              # 기존 프로세스 종료
+              pkill -f 'eatngo-customer-api' || true
+              sleep 2
+              
+              # JAR 파일 찾기
+              JAR_FILE=$(find /home/ec2-user/eatngo-customer-api -name "*.jar" -type f | head -n 1)
+              
+              if [ -z "$JAR_FILE" ]; then
+                echo "ERROR: JAR file not found!"
+                ls -la /home/ec2-user/
+                exit 1
+              fi
+              
+              echo "Found JAR file: $JAR_FILE"
+              
+              (
+                export AWS_REGION=ap-northeast-2
+                export AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY_ID }}
+                export AWS_SECRET_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+              
+                setsid nohup java -jar "$JAR_FILE" \
+                  --spring.profiles.active=prod \
+                  --server.port=8080 \
+                  </dev/null >/home/ec2-user/app.log 2>&1 &
+              
+                echo $! > /home/ec2-user/app.pid
+              ) &
+              
+              # 잠시 대기
+              sleep 3
+              
+              # 프로세스 확인
+              if [ -f /home/ec2-user/app.pid ]; then
+                PID=$(cat /home/ec2-user/app.pid)
+                if ps -p $PID > /dev/null 2>&1; then
+                  echo "✅ Application started with PID: $PID"
+                else
+                  echo "❌ Application failed to start"
+                  tail -n 20 /home/ec2-user/app.log
+                  exit 1
+                fi
+              else
+                echo "❌ PID file not created"
+                exit 1
+              fi
