@@ -63,15 +63,17 @@ jobs:
           AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      # JAR 파일 존재 확인
+      # Upload 전에 JAR 파일 존재 확인
       - name: Check JAR file
         run: |
           echo "=== Built JAR files ==="
           ls -la eatngo-customer-api/build/libs/
-          if [ ! -f eatngo-customer-api/build/libs/*.jar ]; then
+          JAR_COUNT=$(ls eatngo-customer-api/build/libs/*.jar 2>/dev/null | wc -l)
+          if [ "$JAR_COUNT" -eq 0 ]; then
             echo "ERROR: JAR file not found!"
             exit 1
-          fi   
+          fi
+          echo "Found $JAR_COUNT JAR file(s)"    
 
       - name: Upload jar to EC2
         uses: appleboy/scp-action@v0.1.4
@@ -82,7 +84,6 @@ jobs:
           source: "eatngo-customer-api/build/libs/*.jar"
           target: "/home/ec2-user/eatngo-customer-api"
           timeout: 30s
-          strip_components: 3
 
       # SSH 연결 테스트
       - name: Test SSH and check files
@@ -108,46 +109,35 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           timeout: 60s
           script: |
-            echo "=== Starting Deployment ==="
+            echo "Executing deployment script..."
+
+          # 백그라운드에서 배포 스크립트 실행
+            nohup /home/ec2-user/deploy.sh > /home/ec2-user/deployment.log 2>&1 &
             
-            # 기존 프로세스 종료
-            pkill -f 'eatngo-customer-api' || echo "No existing process"
-            sleep 2
+            # 잠시 대기
+            sleep 8
             
-            # JAR 파일 찾기
-            JAR_FILE=$(find /home/ec2-user -name "*.jar" -type f | head -n 1)
-            
-            if [ -z "$JAR_FILE" ]; then
-              echo "ERROR: JAR file not found!"
-              ls -la /home/ec2-user/
+            # 결과 확인
+            echo "=== Deployment Results ==="
+            if [ -f /home/ec2-user/deploy_error.log ]; then
+              echo "❌ Deployment Error:"
+              cat /home/ec2-user/deploy_error.log
               exit 1
             fi
             
-            echo "Found JAR file: $JAR_FILE"
-            
-            # 환경변수와 함께 완전히 분리된 프로세스로 실행
-            env AWS_REGION=ap-northeast-2 \
-                AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY_ID }} \
-                AWS_SECRET_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
-                setsid java -jar "$JAR_FILE" \
-                --spring.profiles.active=dev \
-                --server.port=8080 \
-                > /home/ec2-user/app.log 2>&1 &
-            
-            APP_PID=$!
-            echo "Application started with PID: $APP_PID"
-            echo $APP_PID > /home/ec2-user/app.pid
-            
-            # 프로세스 확인
-            sleep 3
-            if ps -p $APP_PID > /dev/null; then
-              echo "✅ Application is running!"
+            if [ -f /home/ec2-user/app.pid ]; then
+              PID=$(cat /home/ec2-user/app.pid)
+              if ps -p $PID > /dev/null; then
+                echo "✅ Application is running (PID: $PID)"
+              else
+                echo "❌ Application process died"
+                tail -n 20 /home/ec2-user/app.log
+                exit 1
+              fi
             else
-              echo "❌ Application failed to start"
-              echo "=== Error logs ==="
-              tail -n 20 /home/ec2-user/app.log
+              echo "❌ PID file not found"
               exit 1
-            fi      
+            fi
 
       # 배포 완료 후 보안 그룹에서 IP 제거
       - name: Remove IP from security group
