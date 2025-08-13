@@ -57,4 +57,4 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             pkill -f 'eatngo-customer-api' || true
-            nohup java -jar /home/ec2-user/eatngo-customer-api/*.jar --spring.profiles.active=dev > app.log 2>&1 &
+            nohup java -jar /home/ec2-user/eatngo-customer-api/*.jar --spring.profiles.active=prod > app.log 2>&1 &
